@@ -76,6 +76,7 @@
 						model: model
 					}))}
 					{pinModelHandler}
+					groupByServer
 					{className}
 					{triggerClassName}
 					{placement}

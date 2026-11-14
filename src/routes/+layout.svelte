@@ -6,6 +6,7 @@
 		unlockNotificationAudio
 	} from '$lib/utils/audio';
 	import CommentsHost from '$lib/components/comments/CommentsHost.svelte';
+	import HugoEasterEgg from '$lib/components/common/HugoEasterEgg.svelte';
 	import { io } from 'socket.io-client';
 	import { spring } from 'svelte/motion';
 	import { createPyodideWorker } from '$lib/pyodide/createPyodideWorker';
@@ -1558,6 +1559,8 @@
 		<CommentsHost />
 	</div>
 {/if}
+
+<HugoEasterEgg />
 
 {#if $config?.features.enable_community_sharing}
 	<SyncStatsModal bind:show={showSyncStatsModal} eventData={syncStatsEventData} />

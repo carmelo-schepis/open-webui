@@ -108,7 +108,12 @@
 		updateChatFolderIdById
 	} from '$lib/apis/chats';
 	import { resolveTerminalConnection, setCwd, type FilesystemFile } from '$lib/apis/terminal';
-	import { generateOpenAIChatCompletion, getErrorMessage } from '$lib/apis/openai';
+	import {
+		generateOpenAIChatCompletion,
+		getErrorMessage,
+		streamOpenAIChatCompletion
+	} from '$lib/apis/openai';
+	import { buildHumanizerMessages, humanizeRequest, humanizerEnabled } from '$lib/utils/humanizer';
 	import { processUrl, processWebSearch } from '$lib/apis/retrieval';
 	import {
 		getAndUpdateUserLocation,
@@ -3805,10 +3810,158 @@
 
 		saveSessionSelectedModels();
 
+		if ($humanizerEnabled && !bridgeRequest) {
+			return await runHumanizer(userMessageId, inputContent);
+		}
+
 		return await sendMessage(history, userMessageId, {
 			modelId: bridgeRequest?.modelId ?? null
 		});
 	};
+
+	// Humanizer: rewrites `sourceText` with the selected model and appends the result as a
+	// new assistant message (labelled "Humanized"). Streams through the same
+	// /api/chat/completions endpoint as every other UI feature, so auth and connections apply.
+	let humanizerController: AbortController | null = null;
+
+	const runHumanizer = async (parentId: string, sourceText: string) => {
+		const modelId = atSelectedModel?.id ?? selectedModels.find(Boolean);
+		const model = $models.find((m) => m.id === modelId);
+		if (!model) {
+			toast.error($i18n.t('Model not selected'));
+			return null;
+		}
+		if (atSelectedModel) {
+			selectedModels = [atSelectedModel.id];
+			atSelectedModel = undefined;
+		}
+
+		// A new request supersedes any humanizer stream still running.
+		humanizerController?.abort();
+		const controller = new AbortController();
+		humanizerController = controller;
+		const currentHistory = history;
+
+		const responseMessageId = uuidv4();
+		const responseMessage: any = {
+			parentId,
+			id: responseMessageId,
+			childrenIds: [],
+			role: 'assistant',
+			user_id: $user?.id,
+			content: '',
+			done: false,
+			model: model.id,
+			modelName: model.name ?? model.id,
+			modelIdx: 0,
+			humanized: true,
+			timestamp: Math.floor(Date.now() / 1000)
+		};
+
+		history.messages[responseMessageId] = responseMessage;
+		if (parentId !== null && history.messages[parentId]) {
+			history.messages[parentId].childrenIds = [
+				...history.messages[parentId].childrenIds,
+				responseMessageId
+			];
+		}
+		history.currentId = responseMessageId;
+		history = history;
+		generating = true;
+		generationController = controller;
+		await tick();
+		if (autoScroll) scrollToBottom();
+
+		let completed = false;
+		try {
+			const [res] = await streamOpenAIChatCompletion(
+				localStorage.token,
+				{
+					model: model.id,
+					messages: buildHumanizerMessages(sourceText),
+					params: { temperature: 0.2 }
+				},
+				controller.signal
+			);
+			if (!res.body) throw new Error($i18n.t('Server connection failed'));
+
+			const textStream = await createOpenAITextStream(res.body, false);
+			for await (const update of textStream) {
+				if (controller.signal.aborted || history !== currentHistory) break;
+				const { value, done, error } = update;
+				if (error) throw error;
+				if (done) {
+					completed = true;
+					break;
+				}
+				if (responseMessage.content === '' && value === '\n') continue;
+				responseMessage.content += value;
+				history.messages[responseMessageId] = responseMessage;
+				history = history;
+				autoScrollToBottom();
+			}
+		} catch (error) {
+			if (!controller.signal.aborted) {
+				responseMessage.error = { content: getErrorMessage(error) };
+				toast.error(getErrorMessage(error));
+			}
+		} finally {
+			responseMessage.done = true;
+			if (history === currentHistory) {
+				history.messages[responseMessageId] = responseMessage;
+				history = history;
+			}
+			if (humanizerController === controller) humanizerController = null;
+			if (generationController === controller) {
+				generating = false;
+				generationController = null;
+			}
+		}
+
+		if (history !== currentHistory) return null;
+
+		if (!controller.signal.aborted && !responseMessage.error) {
+			try {
+				const hadChat = !!$chatId;
+				const _chatId = hadChat ? $chatId : await initChatHandler(history);
+				if (hadChat) {
+					await saveChatHandler(_chatId, history);
+				} else if (_chatId && !$temporaryChatEnabled) {
+					// The chat is born here instead of in the completion pipeline, so title it too.
+					const title = sourceText.trim().replace(/\s+/g, ' ').slice(0, 50);
+					if (title) {
+						await updateChatById(localStorage.token, _chatId, { title });
+						await chatTitle.set(title);
+						await refreshChatList(localStorage.token);
+					}
+				}
+				if ($chatId) await processNextInQueue($chatId);
+			} catch (error) {
+				console.error(error);
+			}
+		}
+
+		return {
+			status: 'submitted' as const,
+			chatId: $chatId,
+			userMessageId: parentId,
+			assistantMessageId: responseMessageId,
+			taskIds: [] as string[]
+		};
+	};
+
+	// "Humanize" action on the last assistant message: append a humanized copy, original untouched.
+	$: if ($humanizeRequest) {
+		const messageId = $humanizeRequest.messageId;
+		humanizeRequest.set(null);
+		const source = history.messages[messageId];
+		if (source?.role === 'assistant' && source.done && history.currentId === messageId) {
+			const text = getOutputText(source.output) || removeAllDetails(source.content ?? '');
+			if (text.trim()) runHumanizer(messageId, text);
+		}
+	}
+
+	onDestroy(() => humanizerController?.abort());
 
 	const handleManualCompact = async () => {
 		if (!contextCompactionEnabled) {

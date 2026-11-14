@@ -187,6 +187,10 @@
 					>Tim J. Baek</a
 				>
 			</div>
+
+			<div class="font-mono text-[0.6875rem] text-gray-400 dark:text-gray-600">
+				This was created by Carmelo Schepis
+			</div>
 		</UserSettingSection>
 	</div>
 </div>

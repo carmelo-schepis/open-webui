@@ -456,6 +456,43 @@ export const generateOpenAIChatCompletion = async (
 	return res;
 };
 
+/**
+ * Streaming sibling of generateOpenAIChatCompletion: same `/api/chat/completions`
+ * endpoint, auth and body shape, but without a session/chat id the backend replies
+ * with a plain SSE stream instead of a socket task. Returns [response, controller]
+ * (like generateMoACompletion) so callers can abort. Pass `signal` to chain an
+ * external AbortController.
+ */
+export const streamOpenAIChatCompletion = async (
+	token: string = '',
+	body: object,
+	signal?: AbortSignal,
+	url: string = `${WEBUI_BASE_URL}/api`
+): Promise<[Response, AbortController]> => {
+	const controller = new AbortController();
+	if (signal) {
+		if (signal.aborted) controller.abort();
+		else signal.addEventListener('abort', () => controller.abort(), { once: true });
+	}
+
+	const res = await fetch(`${url}/chat/completions`, {
+		signal: controller.signal,
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${token}`,
+			'Content-Type': 'application/json'
+		},
+		credentials: 'include',
+		body: JSON.stringify({ ...body, stream: true })
+	});
+
+	if (!res.ok) {
+		throw getErrorMessage(await res.json().catch(() => null));
+	}
+
+	return [res, controller];
+};
+
 export const synthesizeOpenAISpeech = async (
 	token: string = '',
 	speaker: string = 'alloy',

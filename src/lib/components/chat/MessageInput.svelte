@@ -75,6 +75,8 @@
 	import { uploadFile } from '$lib/apis/files';
 	import { filesystemFile, getCwd, uploadNewFileToTerminal } from '$lib/apis/terminal';
 	import { isSavedChatId } from '$lib/utils/chatId';
+	import { isAutoOpenPending, retireAutoOpen } from '$lib/utils/modelSelectorAutoOpen';
+	import { humanizerEnabled } from '$lib/utils/humanizer';
 	import { generateAutoCompletion } from '$lib/apis';
 	import { deleteFileById } from '$lib/apis/files';
 	import { getChatById } from '$lib/apis/chats';
@@ -812,7 +814,18 @@
 
 	let chatInputContainerElement;
 	let chatInputElement: RichTextInput;
-	let modelSelector;
+	let modelSelector: any;
+
+	// Open the model selector once on a brand-new chat, after the model list has loaded.
+	const maybeAutoOpenModelSelector = (currentChatId: string, currentMessageId: string | null) => {
+		if (!isAutoOpenPending()) return;
+		retireAutoOpen();
+		if (currentChatId || currentMessageId || window.location.pathname !== '/') return;
+		tick().then(() => modelSelector?.open());
+	};
+	$: if (modelSelector && $models.length > 0) {
+		maybeAutoOpenModelSelector(chatId, history?.currentId ?? null);
+	}
 
 	let filesInputElement;
 	let commandsElement;
@@ -2654,36 +2667,34 @@
 
 										<!-- Retired menu label: keep its translation. {$i18n.t('Integrations')} -->
 										<svelte:fragment slot="integrations">
-											{#if showWebSearchButton || showImageGenerationButton || showCodeInterpreterButton || showToolsButton || showSkillsButton || (toggleFilters && toggleFilters.length > 0)}
-												<IntegrationsMenu
-													bind:show={showInputMenu}
-													bind:tab={inputMenuTab}
-													selectedModels={selectedModelIds}
-													{toggleFilters}
-													{showWebSearchButton}
-													{showImageGenerationButton}
-													{showCodeInterpreterButton}
-													bind:selectedToolIds
-													bind:selectedSkillIds
-													bind:selectedFilterIds
-													bind:webSearchEnabled
-													bind:imageGenerationEnabled
-													bind:codeInterpreterEnabled
-													oauthRedirectHandler={(tool: {
-														id: string;
-														serverId: string;
-														authType?: string | null;
-													}) => oauthRedirectHandler(tool, chatInputDraft)}
-													{onWebSearchToggle}
-													onShowValves={(e) => {
-														const { type, id } = e;
-														selectedValvesType = type;
-														selectedValvesItemId = id;
-														showValvesModal = true;
-														inputMenuCloseOnOutsideClick = false;
-													}}
-												/>
-											{/if}
+											<IntegrationsMenu
+												bind:show={showInputMenu}
+												bind:tab={inputMenuTab}
+												selectedModels={selectedModelIds}
+												{toggleFilters}
+												{showWebSearchButton}
+												{showImageGenerationButton}
+												{showCodeInterpreterButton}
+												bind:selectedToolIds
+												bind:selectedSkillIds
+												bind:selectedFilterIds
+												bind:webSearchEnabled
+												bind:imageGenerationEnabled
+												bind:codeInterpreterEnabled
+												oauthRedirectHandler={(tool: {
+													id: string;
+													serverId: string;
+													authType?: string | null;
+												}) => oauthRedirectHandler(tool, chatInputDraft)}
+												{onWebSearchToggle}
+												onShowValves={(e) => {
+													const { type, id } = e;
+													selectedValvesType = type;
+													selectedValvesItemId = id;
+													showValvesModal = true;
+													inputMenuCloseOnOutsideClick = false;
+												}}
+											/>
 										</svelte:fragment>
 									</InputMenu>
 
@@ -2903,6 +2914,20 @@
 														: 'focus:outline-hidden rounded-full'}"
 												>
 													<Terminal className="size-3.5" strokeWidth="2" />
+												</button>
+											</Tooltip>
+										{/if}
+
+										{#if $humanizerEnabled}
+											<Tooltip content={$i18n.t('Humanizer')} placement="top">
+												<button
+													aria-label={$i18n.t('Humanizer')}
+													aria-pressed={$humanizerEnabled}
+													on:click|preventDefault={() => humanizerEnabled.set(false)}
+													type="button"
+													class="group p-[0.375rem] flex gap-1.5 items-center text-sm rounded-full transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden text-sky-500 dark:text-sky-300 bg-sky-50 hover:bg-sky-100 dark:bg-sky-400/10 dark:hover:bg-sky-600/10 border border-sky-200/40 dark:border-sky-500/20"
+												>
+													<Sparkles className="size-4" strokeWidth="1.75" />
 												</button>
 											</Tooltip>
 										{/if}

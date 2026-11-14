@@ -56,6 +56,14 @@
 	import TagSelector from '$lib/components/workspace/common/TagSelector.svelte';
 
 	import ModelItem from './ModelItem.svelte';
+	import {
+		getServerLabel,
+		loadOllamaServers,
+		ollamaServers,
+		serverAliases,
+		type OllamaServer,
+		type ServerAliases
+	} from '$lib/utils/serverAliases';
 
 	const i18n: any = getContext('i18n');
 
@@ -71,6 +79,8 @@
 	export let searchPlaceholder: string | undefined = undefined;
 	export let selectionOnly = false;
 	export let includeHidden = false;
+	/** Group models under their Ollama connection (heading = alias or host). */
+	export let groupByServer = false;
 
 	export let items: {
 		label: string;
@@ -154,6 +164,7 @@
 				setOllamaVersion();
 				setProviderDownloadConnections();
 			}
+			if (groupByServer) refreshServers();
 			resetView();
 			await tick();
 			for (const delay of [0, 50, 150]) {
@@ -258,7 +269,7 @@
 		}
 	);
 
-	$: filteredItems = (
+	$: baseFilteredItems = (
 		searchValue
 			? fuse
 					.search(searchValue)
@@ -306,6 +317,101 @@
 						}
 					})
 	).filter((item) => includeHidden || !(item.model?.info?.meta?.hidden ?? false));
+
+	const refreshServers = () => {
+		loadOllamaServers(localStorage.token, $user?.role === 'admin').catch(() => {});
+	};
+
+	type ListRow =
+		| { type: 'header'; key: string; label: string; online: boolean | null; count: number }
+		| { type: 'item'; key: string; itemIndex: number };
+
+	const OTHER_SERVER = -1;
+
+	// Expands the filtered models into per-server rows. A model hosted on several
+	// connections appears once under each (with a small server tag). `items` stays the
+	// flat, selectable list that all index/keyboard logic runs over; `rows` adds headings.
+	const buildRows = (
+		list: any[],
+		enabled: boolean,
+		servers: OllamaServer[],
+		aliases: ServerAliases,
+		showEmptyServers: boolean
+	) => {
+		const plain = {
+			items: list,
+			rows: list.map((item: any, itemIndex: number) => ({
+				type: 'item',
+				key: item.value,
+				itemIndex
+			})) as ListRow[]
+		};
+		if (!enabled) return plain;
+
+		const hasOrigin = list.some((item: any) => (item.model?.ollama?.urls ?? []).length > 0);
+		const offlineServers = showEmptyServers
+			? servers.filter((s: OllamaServer) => s.online === false)
+			: [];
+		if (!hasOrigin && offlineServers.length === 0) return plain;
+
+		const serverOf = (idx: number) => servers.find((s: OllamaServer) => s.idx === idx);
+		const labelOf = (idx: number) =>
+			idx === OTHER_SERVER ? 'Other' : getServerLabel(serverOf(idx) ?? { idx, url: '' }, aliases);
+
+		const buckets = new Map<number, any[]>();
+		for (const item of list) {
+			const urls: number[] = item.model?.ollama?.urls ?? [];
+			const targets = urls.length > 0 ? urls : [OTHER_SERVER];
+			for (const idx of targets) {
+				if (!buckets.has(idx)) buckets.set(idx, []);
+				buckets.get(idx)!.push({
+					...item,
+					rowKey: `${item.value}::${idx}`,
+					serverTag: urls.length > 1 ? labelOf(idx) : undefined
+				});
+			}
+		}
+		for (const server of offlineServers) {
+			if (!buckets.has(server.idx)) buckets.set(server.idx, []);
+		}
+
+		const items: any[] = [];
+		const rows: ListRow[] = [];
+		const order = [...buckets.keys()].sort((a, b) =>
+			a === OTHER_SERVER ? 1 : b === OTHER_SERVER ? -1 : a - b
+		);
+		for (const idx of order) {
+			const bucket = buckets.get(idx)!;
+			const online = idx === OTHER_SERVER ? null : serverOf(idx) ? serverOf(idx)!.online : true;
+			rows.push({
+				type: 'header',
+				key: `header::${idx}`,
+				label: labelOf(idx),
+				online,
+				count: bucket.length
+			});
+			for (const entry of bucket) {
+				rows.push({ type: 'item', key: entry.rowKey, itemIndex: items.length });
+				items.push(entry);
+			}
+		}
+		return { items, rows };
+	};
+
+	$: grouped = buildRows(
+		baseFilteredItems,
+		groupByServer && !selectionOnly,
+		$ollamaServers,
+		$serverAliases,
+		!searchValue && !selectedTag && !selectedConnectionType
+	);
+	$: filteredItems = grouped.items;
+	$: rows = grouped.rows;
+	$: rowOfItem = rows.reduce((acc, row, rowIndex) => {
+		if (row.type === 'item') acc[row.itemIndex] = rowIndex;
+		return acc;
+	}, [] as number[]);
+	const rowIndexOf = (itemIdx: number) => rowOfItem[itemIdx] ?? itemIdx;
 
 	$: sanitizedSearchValue = searchValue.trim();
 	$: downloadTargets =
@@ -400,7 +506,10 @@
 		}
 
 		// Set the virtual scroll position so the selected item is rendered and centered
-		const targetScrollTop = Math.max(0, selectedModelIdx * ITEM_HEIGHT - 128 + ITEM_HEIGHT / 2);
+		const targetScrollTop = Math.max(
+			0,
+			rowIndexOf(selectedModelIdx) * ITEM_HEIGHT - 128 + ITEM_HEIGHT / 2
+		);
 		listScrollTop = targetScrollTop;
 
 		await tick();
@@ -760,6 +869,7 @@
 			// Remove duplicates and sort
 			tags = Array.from(new Set(tags)).sort((a, b) => a.localeCompare(b));
 		}
+		if (groupByServer) refreshServers();
 	});
 
 	const cancelModelPullHandler = async (model: string) => {
@@ -886,7 +996,7 @@
 
 	$: visibleStart = Math.max(0, Math.floor(listScrollTop / ITEM_HEIGHT) - OVERSCAN);
 	$: visibleEnd = Math.min(
-		filteredItems.length,
+		rows.length,
 		Math.ceil((listScrollTop + listViewportHeight) / ITEM_HEIGHT) + OVERSCAN
 	);
 </script>
@@ -968,7 +1078,8 @@
 								aria-controls="model-selector-list"
 								aria-activedescendant={filteredItems.length + downloadTargets.length > 0 &&
 								(selectedModelIdx >= filteredItems.length ||
-									(selectedModelIdx >= visibleStart && selectedModelIdx < visibleEnd))
+									(rowIndexOf(selectedModelIdx) >= visibleStart &&
+										rowIndexOf(selectedModelIdx) < visibleEnd))
 									? `model-option-${selectedModelIdx}`
 									: undefined}
 								on:keydown={(e) => {
@@ -999,11 +1110,12 @@
 									if (
 										listContainer &&
 										selectedModelIdx < filteredItems.length &&
-										(selectedModelIdx < visibleStart || selectedModelIdx >= visibleEnd)
+										(rowIndexOf(selectedModelIdx) < visibleStart ||
+											rowIndexOf(selectedModelIdx) >= visibleEnd)
 									) {
 										listScrollTop = Math.max(
 											0,
-											selectedModelIdx * ITEM_HEIGHT - 128 + ITEM_HEIGHT / 2
+											rowIndexOf(selectedModelIdx) * ITEM_HEIGHT - 128 + ITEM_HEIGHT / 2
 										);
 										listContainer.scrollTop = listScrollTop;
 									}
@@ -1123,29 +1235,56 @@
 								}}
 							>
 								<div style="height: {visibleStart * ITEM_HEIGHT}px;" />
-								{#each filteredItems.slice(visibleStart, visibleEnd) as item, i (item.value)}
-									{@const index = visibleStart + i}
-									<ModelItem
-										onComment={(request) => (comments = request)}
-										bind:selectedModelIdx
-										{item}
-										{index}
-										value={primaryValue}
-										{pinModelHandler}
-										{unloadModelHandler}
-										{deleteModelHandler}
-										{selectionOnly}
-										{compareEnabled}
-										{selectedValues}
-										onClick={() => {
-											selectItem(item, index);
-										}}
-										onEdit={() => {
-											show = false;
-										}}
-									/>
+								{#each rows.slice(visibleStart, visibleEnd) as row, i (row.key)}
+									{#if row.type === 'header'}
+										<div
+											role="presentation"
+											data-server-heading
+											style="height: {ITEM_HEIGHT}px;"
+											class="flex select-none items-center gap-1.5 px-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-500 {visibleStart +
+												i >
+											0
+												? 'border-t border-gray-100 dark:border-gray-800'
+												: ''}"
+										>
+											{#if row.online !== null}
+												<span
+													class="size-1.5 shrink-0 rounded-full {row.online
+														? 'bg-emerald-500'
+														: 'bg-red-500/80'}"
+													aria-hidden="true"
+												></span>
+											{/if}
+											<span class="min-w-0 truncate">{row.label}</span>
+											<span class="ml-auto shrink-0 tabular-nums text-gray-400 dark:text-gray-600">
+												{row.online === false && row.count === 0 ? $i18n.t('offline') : row.count}
+											</span>
+										</div>
+									{:else}
+										{@const item = filteredItems[row.itemIndex]}
+										{@const index = row.itemIndex}
+										<ModelItem
+											onComment={(request) => (comments = request)}
+											bind:selectedModelIdx
+											{item}
+											{index}
+											value={primaryValue}
+											{pinModelHandler}
+											{unloadModelHandler}
+											{deleteModelHandler}
+											{selectionOnly}
+											{compareEnabled}
+											{selectedValues}
+											onClick={() => {
+												selectItem(item, index);
+											}}
+											onEdit={() => {
+												show = false;
+											}}
+										/>
+									{/if}
 								{/each}
-								<div style="height: {(filteredItems.length - visibleEnd) * ITEM_HEIGHT}px;" />
+								<div style="height: {(rows.length - visibleEnd) * ITEM_HEIGHT}px;"></div>
 							</div>
 						{/if}
 

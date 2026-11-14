@@ -125,6 +125,17 @@
 	let closeSidebarButton: HTMLButtonElement;
 	let shiftKey = false;
 
+	// Easter egg: seven quick clicks on the logo.
+	let logoClicks: number[] = [];
+	const logoEasterEgg = () => {
+		const now = Date.now();
+		logoClicks = [...logoClicks.filter((time) => now - time < 4000), now];
+		if (logoClicks.length >= 7) {
+			logoClicks = [];
+			toast.message('This was created by Carmelo Schepis');
+		}
+	};
+
 	let selectedChatId = null;
 	const selectedChatIds = writable(new Set<string>());
 	const selectionBusy = writable(false);
@@ -1132,10 +1143,12 @@
 								<!-- LICENSE covers this Open WebUI sidebar logo.
 							Do not alter, remove, obscure, or replace it except as LICENSE permits:
 							https://docs.openwebui.com/license. -->
+								<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 								<img
 									src="{WEBUI_BASE_URL}/static/favicon.png"
 									class="sidebar-new-chat-icon size-5 rounded-full group-hover:hidden"
 									alt=""
+									on:click={logoEasterEgg}
 								/>
 
 								<Sidebar className="size-4 hidden group-hover:flex" />
@@ -1320,11 +1333,13 @@
 						<!-- LICENSE covers this Open WebUI sidebar logo.
 					Do not alter, remove, obscure, or replace it except as LICENSE permits:
 					https://docs.openwebui.com/license. -->
+						<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 						<img
 							crossorigin="anonymous"
 							src="{WEBUI_BASE_URL}/static/favicon.png"
 							class="sidebar-new-chat-icon size-5 rounded-full"
 							alt=""
+							on:click={logoEasterEgg}
 						/>
 					</a>
 
@@ -1334,6 +1349,7 @@
 					https://docs.openwebui.com/license. -->
 						<div
 							id="sidebar-webui-name"
+							title="created by Carmelo Schepis"
 							class=" self-center truncate font-normal text-gray-700 dark:text-gray-200"
 						>
 							{$WEBUI_NAME}
