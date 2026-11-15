@@ -1,0 +1,13 @@
+{
+	"name": "hugo-deep-research",
+	"version": "1.0.0",
+	"description": "HUGO Harness companion service: multi-source web research streamed as NDJSON research events",
+	"main": "server.js",
+	"type": "module",
+	"scripts": {
+		"start": "node server.js"
+	},
+	"engines": {
+		"node": ">=18"
+	}
+}

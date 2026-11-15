@@ -377,6 +377,15 @@
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
 	let codeInterpreterEnabled = false;
+	// Coding mode: sidebar entry opens /coding, which boots a fresh chat with the
+	// code interpreter enabled and a coding-focused system prompt. The preset
+	// stays bound to chats started there even after navigation moves to /c/:id.
+	$: codingPresetActive = chatIdProp === '' && !embedded && $page.url.pathname === '/coding';
+	let codingPresetChatId = '';
+	$: if (codingPresetActive && $chatId) codingPresetChatId = $chatId;
+	$: codingPresetForChat = codingPresetActive || (codingPresetChatId === $chatId && !!codingPresetChatId);
+	const CODING_SYSTEM_PROMPT =
+		'You are an expert coding assistant. Prefer complete, runnable code over prose. Include brief explanations of key decisions, note edge cases, and keep code in fenced code blocks with the correct language tag.';
 	let webSearchActive = false;
 	let showWebSearchConfirm = false;
 	let pendingWebSearchPrompt: string | null = null;
@@ -1245,6 +1254,9 @@
 			defaults.webSearchEnabled &&= !!featureAvailable('web_search');
 			defaults.imageGenerationEnabled &&= !!featureAvailable('image_generation');
 			defaults.codeInterpreterEnabled &&= !!featureAvailable('code_interpreter');
+			if (codingPresetForChat && featureAvailable('code_interpreter')) {
+				defaults.codeInterpreterEnabled = true;
+			}
 			if (!currentModels.some((model) => model.info?.meta?.capabilities?.terminal ?? true)) {
 				defaults.terminalId = null;
 			}
@@ -4666,11 +4678,13 @@
 			true;
 		// Always include system prompt — backend extracts it and prepends to DB messages.
 		// Only temp chats need conversation messages (persisted chats load from DB).
-		let messages: any[] = [
-			params?.system || $settings.system
-				? { role: 'system', content: `${params?.system || $settings?.system || ''}` }
-				: undefined
-		].filter(Boolean);
+		const presetSystem = codingPresetForChat ? CODING_SYSTEM_PROMPT : '';
+		const systemContent = [presetSystem, params?.system || $settings?.system || '']
+			.filter(Boolean)
+			.join('\n\n');
+		let messages: any[] = systemContent
+			? [{ role: 'system', content: systemContent }]
+			: [];
 
 		if ($temporaryChatEnabled) {
 			messages = [

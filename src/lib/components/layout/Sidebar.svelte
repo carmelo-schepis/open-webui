@@ -87,6 +87,7 @@
 	import Loader from '../common/Loader.svelte';
 	import Folder from '../common/Folder.svelte';
 	import SidebarSection from './Sidebar/Section.svelte';
+	import UptimeList from './Sidebar/Uptime.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Folders from './Sidebar/Folders.svelte';
 	import SharedFolderItem from './Sidebar/SharedFolderItem.svelte';
@@ -99,8 +100,10 @@
 	import PinnedNoteList from './Sidebar/PinnedNoteList.svelte';
 	import CalendarIcon from './Sidebar/icons/Calendar.svelte';
 	import ClockIcon from './Sidebar/icons/Clock.svelte';
+	import CodeBracketsIcon from '../icons/CodeBrackets.svelte';
 	import CodeIcon from './Sidebar/icons/Code.svelte';
 	import EditPencilIcon from './Sidebar/icons/EditPencil.svelte';
+	import GlobeAltIcon from '../icons/GlobeAlt.svelte';
 	import NotesIcon from './Sidebar/icons/Notes.svelte';
 	import SearchIcon from './Sidebar/icons/Search.svelte';
 	import Sidebar from '../icons/Sidebar.svelte';
@@ -116,9 +119,18 @@
 	import MoreHorizontalIcon from './Sidebar/icons/MoreHorizontal.svelte';
 	import MobileSwipePanel from '../common/MobileSwipePanel.svelte';
 
-	const DEFAULT_PINNED_ITEMS = ['notes', 'workspace'];
+	const DEFAULT_PINNED_ITEMS = [
+		'notes',
+		'workspace',
+		'deepResearch',
+		'coding',
+		'automations',
+		'calendar',
+		'playground'
+	];
 
 	let scrollTop = 0;
+	let showUptime = true;
 
 	let navElement: HTMLDivElement;
 	let openSidebarButton: HTMLButtonElement;
@@ -319,6 +331,10 @@
 				);
 			case 'playground':
 				return $user?.role === 'admin';
+			case 'deepResearch':
+				return true;
+			case 'coding':
+				return true;
 			default:
 				return false;
 		}
@@ -330,7 +346,9 @@
 			workspace: { label: $i18n.t('Workspace'), href: '/workspace', iconType: 'workspace' },
 			automations: { label: $i18n.t('Automations'), href: '/automations', iconType: 'automations' },
 			calendar: { label: $i18n.t('Calendar'), href: '/calendar', iconType: 'calendar' },
-			playground: { label: $i18n.t('Playground'), href: '/playground', iconType: 'playground' }
+			playground: { label: $i18n.t('Playground'), href: '/playground', iconType: 'playground' },
+			deepResearch: { label: 'Deep Research', href: '/deep-research', iconType: 'deepResearch' },
+			coding: { label: 'Coding', href: '/coding', iconType: 'coding' }
 		};
 		return items[id];
 	};
@@ -340,7 +358,9 @@
 		workspace: '/workspace',
 		calendar: '/calendar',
 		automations: '/automations',
-		playground: '/playground'
+		playground: '/playground',
+		deepResearch: '/deep-research',
+		coding: '/coding'
 	};
 
 	const getActiveMenuItemId = (pathname) => {
@@ -1240,6 +1260,10 @@
 												<CalendarIcon className="size-4" strokeWidth="1.5" />
 											{:else if itemId === 'playground'}
 												<CodeIcon className="size-4" strokeWidth="1.5" />
+											{:else if itemId === 'deepResearch'}
+												<GlobeAltIcon className="size-4" strokeWidth="1.5" />
+											{:else if itemId === 'coding'}
+												<CodeBracketsIcon className="size-4" strokeWidth="1.5" />
 											{/if}
 										</div>
 									</a>
@@ -1488,6 +1512,10 @@
 													<CalendarIcon className="size-4" strokeWidth="1.5" />
 												{:else if itemId === 'playground'}
 													<CodeIcon className="size-4" strokeWidth="1.5" />
+												{:else if itemId === 'deepResearch'}
+													<GlobeAltIcon className="size-4" strokeWidth="1.5" />
+												{:else if itemId === 'coding'}
+													<CodeBracketsIcon className="size-4" strokeWidth="1.5" />
 												{/if}
 											</div>
 
@@ -1502,6 +1530,17 @@
 							{/each}
 						</div>
 					</div>
+
+					{#if $user?.role === 'admin'}
+						<SidebarSection
+							id="sidebar-uptime"
+							bind:open={showUptime}
+							name={$i18n.t('Uptime')}
+							dragAndDrop={false}
+						>
+							<UptimeList />
+						</SidebarSection>
+					{/if}
 
 					{#if $visiblePinnedModels.length > 0}
 						<SidebarSection
