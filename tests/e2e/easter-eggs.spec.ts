@@ -27,6 +27,7 @@ test.describe('easter eggs', () => {
 		const logo = page.locator('img.sidebar-new-chat-icon').first();
 		await logo.waitFor({ state: 'visible', timeout: 30_000 });
 		const box = await logo.boundingBox();
+		if (!box) return;
 		for (let i = 0; i < 7; i++) {
 			await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 		}

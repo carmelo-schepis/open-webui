@@ -39,6 +39,7 @@ export default defineConfig({
 	webServer: process.env.HARNESS_NO_WEB_SERVER
 		? undefined
 		: {
+				command: 'npm run dev',
 				url: baseURL,
 				reuseExistingServer: true,
 				timeout: 120_000

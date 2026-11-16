@@ -16,7 +16,7 @@ test.describe('humanizer', () => {
 		const before = await toggle.getAttribute('aria-checked');
 
 		await toggle.dispatchEvent('click');
-		const after = await toggle.getAttribute('aria-checked');
+		const after = (await toggle.getAttribute('aria-checked')) ?? '';
 		expect(after).not.toBe(before);
 
 		// Persisted in settings storage for the next turn.
