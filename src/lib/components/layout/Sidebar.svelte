@@ -87,6 +87,7 @@
 	import Loader from '../common/Loader.svelte';
 	import Folder from '../common/Folder.svelte';
 	import SidebarSection from './Sidebar/Section.svelte';
+	import UptimeList from './Sidebar/Uptime.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Folders from './Sidebar/Folders.svelte';
 	import SharedFolderItem from './Sidebar/SharedFolderItem.svelte';
@@ -99,8 +100,10 @@
 	import PinnedNoteList from './Sidebar/PinnedNoteList.svelte';
 	import CalendarIcon from './Sidebar/icons/Calendar.svelte';
 	import ClockIcon from './Sidebar/icons/Clock.svelte';
+	import CodeBracketsIcon from '../icons/CodeBrackets.svelte';
 	import CodeIcon from './Sidebar/icons/Code.svelte';
 	import EditPencilIcon from './Sidebar/icons/EditPencil.svelte';
+	import GlobeAltIcon from '../icons/GlobeAlt.svelte';
 	import NotesIcon from './Sidebar/icons/Notes.svelte';
 	import SearchIcon from './Sidebar/icons/Search.svelte';
 	import Sidebar from '../icons/Sidebar.svelte';
@@ -116,14 +119,34 @@
 	import MoreHorizontalIcon from './Sidebar/icons/MoreHorizontal.svelte';
 	import MobileSwipePanel from '../common/MobileSwipePanel.svelte';
 
-	const DEFAULT_PINNED_ITEMS = ['notes', 'workspace'];
+	const DEFAULT_PINNED_ITEMS = [
+		'notes',
+		'workspace',
+		'deepResearch',
+		'coding',
+		'automations',
+		'calendar',
+		'playground'
+	];
 
 	let scrollTop = 0;
+	let showUptime = true;
 
 	let navElement: HTMLDivElement;
 	let openSidebarButton: HTMLButtonElement;
 	let closeSidebarButton: HTMLButtonElement;
 	let shiftKey = false;
+
+	// Easter egg: seven quick clicks on the logo.
+	let logoClicks: number[] = [];
+	const logoEasterEgg = () => {
+		const now = Date.now();
+		logoClicks = [...logoClicks.filter((time) => now - time < 4000), now];
+		if (logoClicks.length >= 7) {
+			logoClicks = [];
+			toast.message('This was created by Carmelo Schepis');
+		}
+	};
 
 	let selectedChatId = null;
 	const selectedChatIds = writable(new Set<string>());
@@ -308,6 +331,10 @@
 				);
 			case 'playground':
 				return $user?.role === 'admin';
+			case 'deepResearch':
+				return true;
+			case 'coding':
+				return true;
 			default:
 				return false;
 		}
@@ -319,7 +346,9 @@
 			workspace: { label: $i18n.t('Workspace'), href: '/workspace', iconType: 'workspace' },
 			automations: { label: $i18n.t('Automations'), href: '/automations', iconType: 'automations' },
 			calendar: { label: $i18n.t('Calendar'), href: '/calendar', iconType: 'calendar' },
-			playground: { label: $i18n.t('Playground'), href: '/playground', iconType: 'playground' }
+			playground: { label: $i18n.t('Playground'), href: '/playground', iconType: 'playground' },
+			deepResearch: { label: 'Deep Research', href: '/deep-research', iconType: 'deepResearch' },
+			coding: { label: 'Coding', href: '/coding', iconType: 'coding' }
 		};
 		return items[id];
 	};
@@ -329,7 +358,9 @@
 		workspace: '/workspace',
 		calendar: '/calendar',
 		automations: '/automations',
-		playground: '/playground'
+		playground: '/playground',
+		deepResearch: '/deep-research',
+		coding: '/coding'
 	};
 
 	const getActiveMenuItemId = (pathname) => {
@@ -1132,10 +1163,12 @@
 								<!-- LICENSE covers this Open WebUI sidebar logo.
 							Do not alter, remove, obscure, or replace it except as LICENSE permits:
 							https://docs.openwebui.com/license. -->
+								<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 								<img
 									src="{WEBUI_BASE_URL}/static/favicon.png"
 									class="sidebar-new-chat-icon size-5 rounded-full group-hover:hidden"
 									alt=""
+									on:click={logoEasterEgg}
 								/>
 
 								<Sidebar className="size-4 hidden group-hover:flex" />
@@ -1227,6 +1260,10 @@
 												<CalendarIcon className="size-4" strokeWidth="1.5" />
 											{:else if itemId === 'playground'}
 												<CodeIcon className="size-4" strokeWidth="1.5" />
+											{:else if itemId === 'deepResearch'}
+												<GlobeAltIcon className="size-4" strokeWidth="1.5" />
+											{:else if itemId === 'coding'}
+												<CodeBracketsIcon className="size-4" strokeWidth="1.5" />
 											{/if}
 										</div>
 									</a>
@@ -1320,12 +1357,19 @@
 						<!-- LICENSE covers this Open WebUI sidebar logo.
 					Do not alter, remove, obscure, or replace it except as LICENSE permits:
 					https://docs.openwebui.com/license. -->
-						<img
-							crossorigin="anonymous"
-							src="{WEBUI_BASE_URL}/static/favicon.png"
-							class="sidebar-new-chat-icon size-5 rounded-full"
-							alt=""
-						/>
+						<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+							<img
+								crossorigin="anonymous"
+								src="{WEBUI_BASE_URL}/static/favicon.png"
+								class="sidebar-new-chat-icon size-5 rounded-full"
+								alt=""
+								on:click={(e) => {
+									// Keep the wrapper's New Chat navigation from resetting the counter.
+									e.preventDefault();
+									e.stopPropagation();
+									logoEasterEgg();
+								}}
+							/>
 					</a>
 
 					<a href="/" class="flex min-w-0 flex-1 px-0.5" on:click={newChatHandler}>
@@ -1334,6 +1378,7 @@
 					https://docs.openwebui.com/license. -->
 						<div
 							id="sidebar-webui-name"
+							title="created by Carmelo Schepis"
 							class=" self-center truncate font-normal text-gray-700 dark:text-gray-200"
 						>
 							{$WEBUI_NAME}
@@ -1472,6 +1517,10 @@
 													<CalendarIcon className="size-4" strokeWidth="1.5" />
 												{:else if itemId === 'playground'}
 													<CodeIcon className="size-4" strokeWidth="1.5" />
+												{:else if itemId === 'deepResearch'}
+													<GlobeAltIcon className="size-4" strokeWidth="1.5" />
+												{:else if itemId === 'coding'}
+													<CodeBracketsIcon className="size-4" strokeWidth="1.5" />
 												{/if}
 											</div>
 
@@ -1486,6 +1535,17 @@
 							{/each}
 						</div>
 					</div>
+
+					{#if $user?.role === 'admin'}
+						<SidebarSection
+							id="sidebar-uptime"
+							bind:open={showUptime}
+							name={$i18n.t('Uptime')}
+							dragAndDrop={false}
+						>
+							<UptimeList />
+						</SidebarSection>
+					{/if}
 
 					{#if $visiblePinnedModels.length > 0}
 						<SidebarSection

@@ -18,7 +18,7 @@ export function setTheme(value: string): void {
 		const colors =
 			value === 'oled-dark'
 				? ['#101010', '#050505', '#000000', '#000000']
-				: ['#333', '#262626', '#171717', '#0d0d0d'];
+				: ['#212327', '#191919', '#0a0a0a', '#060606'];
 		['800', '850', '900', '950'].forEach((shade, index) => {
 			root.style.setProperty(`--color-gray-${shade}`, colors[index]);
 		});
@@ -27,7 +27,7 @@ export function setTheme(value: string): void {
 		.querySelector('meta[name="theme-color"]')
 		?.setAttribute(
 			'content',
-			value === 'her' ? '#983724' : value === 'oled-dark' ? '#000000' : dark ? '#171717' : '#ffffff'
+			value === 'her' ? '#983724' : value === 'oled-dark' ? '#000000' : dark ? '#0a0a0a' : '#fafaf7'
 		);
 	window.applyTheme?.();
 }

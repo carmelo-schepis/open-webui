@@ -6,6 +6,7 @@
 		unlockNotificationAudio
 	} from '$lib/utils/audio';
 	import CommentsHost from '$lib/components/comments/CommentsHost.svelte';
+	import HugoEasterEgg from '$lib/components/common/HugoEasterEgg.svelte';
 	import { io } from 'socket.io-client';
 	import { spring } from 'svelte/motion';
 	import { createPyodideWorker } from '$lib/pyodide/createPyodideWorker';
@@ -71,7 +72,7 @@
 		removeTerminalConnection
 	} from '$lib/utils/connections';
 
-	import { COMMUNITY_ORIGINS, WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
+	import { APP_NAME, COMMUNITY_ORIGINS, WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 	import {
 		bestMatchingLanguage,
 		cleanText,
@@ -655,7 +656,7 @@
 			if ($isLastActiveTab) {
 				if ($settings?.notificationEnabled ?? false) {
 					notify(
-						`${data.title} / Open WebUI`,
+						`${data.title} / HUGO Harness`,
 						{
 							body: timeStr,
 							// LICENSE covers this Open WebUI notification identifier.
@@ -816,7 +817,7 @@
 					if ($isLastActiveTab) {
 						if ($settings?.notificationEnabled ?? false) {
 							notify(
-								`${displayTitle} / Open WebUI`,
+								`${displayTitle} / HUGO Harness`,
 								{
 									body: contentPreview,
 									// LICENSE covers this Open WebUI notification identifier.
@@ -963,7 +964,7 @@
 						// Do not alter, remove, obscure, or replace it except as LICENSE permits:
 						// https://docs.openwebui.com/license.
 						notify(
-							`${title} / Open WebUI`,
+							`${title} / HUGO Harness`,
 							{
 								body: content,
 								icon: `${WEBUI_API_BASE_URL}/users/${data?.user?.id}/profile/image`
@@ -1159,6 +1160,12 @@
 	};
 
 	onMount(async () => {
+		console.log(
+			'%chugo%c\nThis was created by Carmelo Schepis',
+			'font: 400 28px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -0.04em; color: #ff7a17; background: #0a0a0a; padding: 6px 14px; border-radius: 9999px;',
+			'font: 400 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #7d8187;'
+		);
+
 		const originalFetch = window.fetch.bind(window);
 		stopTether = await initializeTether(originalFetch);
 		window.fetch = async (input, init) => {
@@ -1378,7 +1385,11 @@
 			// visual, textual, symbolic identifiers, metadata, and surrounding UI.
 			// Do not alter, remove, obscure, or replace it except as LICENSE permits:
 			// https://docs.openwebui.com/license.
-			await WEBUI_NAME.set(backendConfig.name);
+			// the backend default name is the upstream product name; present it as HUGO Harness
+			await WEBUI_NAME.set(
+				(backendConfig.name ?? '').replace(/\s*\(Open WebUI\)$/, '').replace(/^Open WebUI$/, APP_NAME) ||
+					APP_NAME
+			);
 
 			if ($config) {
 				await setupSocket($config.features?.enable_websocket ?? true);
@@ -1548,6 +1559,8 @@
 		<CommentsHost />
 	</div>
 {/if}
+
+<HugoEasterEgg />
 
 {#if $config?.features.enable_community_sharing}
 	<SyncStatsModal bind:show={showSyncStatsModal} eventData={syncStatsEventData} />

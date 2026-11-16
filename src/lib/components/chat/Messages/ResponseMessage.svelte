@@ -71,6 +71,9 @@
 	import { flyAndScale } from '$lib/utils/transitions';
 	import RegenerateMenu from './ResponseMessage/RegenerateMenu.svelte';
 	import StatusHistory from './ResponseMessage/StatusHistory.svelte';
+	import ActivitySequence from './ActivitySequence.svelte';
+	import SparklesIcon from '$lib/components/icons/Sparkles.svelte';
+	import { humanizeRequest } from '$lib/utils/humanizer';
 	import FullHeightIframe from '$lib/components/common/FullHeightIframe.svelte';
 	import MCPApp from '$lib/components/chat/Messages/MCPApp.svelte';
 	import OutputEditView from './OutputEditView.svelte';
@@ -84,6 +87,7 @@
 		content: string;
 		output?: OutputItem[];
 		contextSummary?: string;
+		humanized?: boolean;
 		files?: { type: string; url: string }[];
 		timestamp: number;
 		role: string;
@@ -727,6 +731,13 @@
 							{localizedModelName}
 						</span>
 					</Tooltip>
+					{#if message.humanized}
+						<span
+							class="shrink-0 rounded border border-gray-200 px-1 font-mono text-[0.625rem] uppercase leading-4 tracking-wider text-gray-500 dark:border-gray-800 dark:text-gray-500"
+						>
+							{$i18n.t('Humanized')}
+						</span>
+					{/if}
 				</Name>
 			{/if}
 
@@ -951,7 +962,9 @@
 								<ContextCompactionLabel status={compactionStatus} {compactPreview} />
 							{/if}
 
-							{#if !compactionStatus && !message.done && !message.error && (hasResponseContent || !hasVisibleStatus)}
+							{#if !compactionStatus && !message.done && !message.error && !hasResponseContent && !hasVisibleStatus}
+								<ActivitySequence />
+							{:else if !compactionStatus && !message.done && !message.error && (hasResponseContent || !hasVisibleStatus)}
 								<div class="text-[0.90625rem] leading-relaxed">
 									<span
 										class="inline-block w-[0.125rem] h-3.5 bg-gray-400 dark:bg-gray-500 ml-0.5 animate-cursor-pulse align-text-bottom"
@@ -1137,6 +1150,20 @@
 										<CopyIcon />
 									</button>
 								</Tooltip>
+
+								{#if !readOnly && isLastMessage && visibleResponseContent.trim()}
+									<Tooltip content={$i18n.t('Humanize')} placement="bottom">
+										<button
+											aria-label={$i18n.t('Humanize')}
+											class="visible inline-flex size-7 shrink-0 items-center justify-center p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-gray-400 hover:text-gray-600 transition humanize-response-button"
+											on:click={() => {
+												humanizeRequest.set({ messageId: message.id });
+											}}
+										>
+											<SparklesIcon className="size-4" strokeWidth="1.75" />
+										</button>
+									</Tooltip>
+								{/if}
 
 								{#if !readOnly && ($user?.role === 'admin' || ($user?.permissions?.chat?.tts ?? true))}
 									<Tooltip content={$i18n.t('Read Aloud')} placement="bottom">

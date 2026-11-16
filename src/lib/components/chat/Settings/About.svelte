@@ -133,7 +133,7 @@
 				Do not alter, remove, obscure, or replace it except as LICENSE permits:
 				https://docs.openwebui.com/license. -->
 				<div class="text-xs text-gray-600 dark:text-gray-400">
-					{#if !$WEBUI_NAME.includes('Open WebUI')}
+					{#if !$WEBUI_NAME.includes('HUGO Harness')}
 						<span>{$WEBUI_NAME}</span> -
 					{/if}
 
@@ -186,6 +186,10 @@
 				<a class="text-gray-500 dark:text-gray-400" href="https://github.com/tjbck" target="_blank"
 					>Tim J. Baek</a
 				>
+			</div>
+
+			<div class="font-mono text-[0.6875rem] text-gray-400 dark:text-gray-600">
+				This was created by Carmelo Schepis
 			</div>
 		</UserSettingSection>
 	</div>

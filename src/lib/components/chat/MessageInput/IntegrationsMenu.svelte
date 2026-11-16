@@ -36,6 +36,7 @@
 	import Wrench from '$lib/components/icons/Wrench.svelte';
 	import Cube from '$lib/components/icons/Cube.svelte';
 	import Sparkles from '$lib/components/icons/Sparkles.svelte';
+	import { humanizerEnabled } from '$lib/utils/humanizer';
 	import GlobeAlt from '$lib/components/icons/GlobeAlt.svelte';
 	import Photo from '$lib/components/icons/Photo.svelte';
 	import Terminal from '$lib/components/icons/Terminal.svelte';
@@ -520,6 +521,34 @@
 				</button>
 			</Tooltip>
 		{/if}
+
+		<Tooltip
+			content={$i18n.t('Rewrite your message so it reads like a person wrote it')}
+			placement="top-start"
+		>
+			<button
+				class="flex w-full justify-between gap-2 items-center h-[1.6875rem] px-2 text-[0.8125rem] font-normal cursor-pointer rounded-xl hover:bg-gray-50/40 dark:hover:bg-gray-800/40"
+				role="menuitemcheckbox"
+				aria-checked={$humanizerEnabled}
+				on:click={() => {
+					humanizerEnabled.set(!$humanizerEnabled);
+				}}
+			>
+				<div class="flex-1 truncate">
+					<div class="flex flex-1 gap-2 items-center">
+						<div class="shrink-0">
+							<Sparkles className="size-3.5" strokeWidth="1.5" />
+						</div>
+
+						<div class=" truncate">{$i18n.t('Humanizer')}</div>
+					</div>
+				</div>
+
+				<div class=" shrink-0" inert>
+					<Switch state={$humanizerEnabled} />
+				</div>
+			</button>
+		</Tooltip>
 	</div>
 {:else if tab === 'tools' && tools}
 	<div class="flex min-h-0 flex-col gap-0.5 overflow-hidden" in:fly={{ x: 20, duration: 150 }}>

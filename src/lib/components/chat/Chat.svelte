@@ -108,7 +108,12 @@
 		updateChatFolderIdById
 	} from '$lib/apis/chats';
 	import { resolveTerminalConnection, setCwd, type FilesystemFile } from '$lib/apis/terminal';
-	import { generateOpenAIChatCompletion, getErrorMessage } from '$lib/apis/openai';
+	import {
+		generateOpenAIChatCompletion,
+		getErrorMessage,
+		streamOpenAIChatCompletion
+	} from '$lib/apis/openai';
+	import { buildHumanizerMessages, humanizeRequest, humanizerEnabled } from '$lib/utils/humanizer';
 	import { processUrl, processWebSearch } from '$lib/apis/retrieval';
 	import {
 		getAndUpdateUserLocation,
@@ -372,6 +377,26 @@
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
 	let codeInterpreterEnabled = false;
+	// Coding mode: sidebar entry opens /coding, which boots a fresh chat with the
+	// code interpreter enabled and a coding-focused system prompt. The preset
+	// stays bound to chats started there even after navigation moves to /c/:id.
+	$: codingPresetActive = chatIdProp === '' && !embedded && $page.url.pathname === '/coding';
+	let codingPresetChatId = '';
+	$: if (codingPresetActive && $chatId) codingPresetChatId = $chatId;
+	$: codingPresetForChat = codingPresetActive || (codingPresetChatId === $chatId && !!codingPresetChatId);
+	// Fresh chats skip setDefaults entirely, so apply the interpreter toggle
+	// once the model list and permissions settle instead.
+	let interpreterPresetApplied = false;
+	$: interpreterAvailable =
+		$config?.features?.enable_code_interpreter &&
+		($user?.role === 'admin' || $user?.permissions?.features?.code_interpreter) &&
+		($models ?? []).every((model) => model.info?.meta?.capabilities?.code_interpreter ?? true);
+	$: if (codingPresetForChat && interpreterAvailable && !interpreterPresetApplied) {
+		interpreterPresetApplied = true;
+		codeInterpreterEnabled = true;
+	}
+	const CODING_SYSTEM_PROMPT =
+		'You are an expert coding assistant. Prefer complete, runnable code over prose. Include brief explanations of key decisions, note edge cases, and keep code in fenced code blocks with the correct language tag.';
 	let webSearchActive = false;
 	let showWebSearchConfirm = false;
 	let pendingWebSearchPrompt: string | null = null;
@@ -1240,6 +1265,9 @@
 			defaults.webSearchEnabled &&= !!featureAvailable('web_search');
 			defaults.imageGenerationEnabled &&= !!featureAvailable('image_generation');
 			defaults.codeInterpreterEnabled &&= !!featureAvailable('code_interpreter');
+			if (codingPresetForChat && featureAvailable('code_interpreter')) {
+				defaults.codeInterpreterEnabled = true;
+			}
 			if (!currentModels.some((model) => model.info?.meta?.capabilities?.terminal ?? true)) {
 				defaults.terminalId = null;
 			}
@@ -3805,10 +3833,158 @@
 
 		saveSessionSelectedModels();
 
+		if ($humanizerEnabled && !bridgeRequest) {
+			return await runHumanizer(userMessageId, inputContent);
+		}
+
 		return await sendMessage(history, userMessageId, {
 			modelId: bridgeRequest?.modelId ?? null
 		});
 	};
+
+	// Humanizer: rewrites `sourceText` with the selected model and appends the result as a
+	// new assistant message (labelled "Humanized"). Streams through the same
+	// /api/chat/completions endpoint as every other UI feature, so auth and connections apply.
+	let humanizerController: AbortController | null = null;
+
+	const runHumanizer = async (parentId: string, sourceText: string) => {
+		const modelId = atSelectedModel?.id ?? selectedModels.find(Boolean);
+		const model = $models.find((m) => m.id === modelId);
+		if (!model) {
+			toast.error($i18n.t('Model not selected'));
+			return null;
+		}
+		if (atSelectedModel) {
+			selectedModels = [atSelectedModel.id];
+			atSelectedModel = undefined;
+		}
+
+		// A new request supersedes any humanizer stream still running.
+		humanizerController?.abort();
+		const controller = new AbortController();
+		humanizerController = controller;
+		const currentHistory = history;
+
+		const responseMessageId = uuidv4();
+		const responseMessage: any = {
+			parentId,
+			id: responseMessageId,
+			childrenIds: [],
+			role: 'assistant',
+			user_id: $user?.id,
+			content: '',
+			done: false,
+			model: model.id,
+			modelName: model.name ?? model.id,
+			modelIdx: 0,
+			humanized: true,
+			timestamp: Math.floor(Date.now() / 1000)
+		};
+
+		history.messages[responseMessageId] = responseMessage;
+		if (parentId !== null && history.messages[parentId]) {
+			history.messages[parentId].childrenIds = [
+				...history.messages[parentId].childrenIds,
+				responseMessageId
+			];
+		}
+		history.currentId = responseMessageId;
+		history = history;
+		generating = true;
+		generationController = controller;
+		await tick();
+		if (autoScroll) scrollToBottom();
+
+		let completed = false;
+		try {
+			const [res] = await streamOpenAIChatCompletion(
+				localStorage.token,
+				{
+					model: model.id,
+					messages: buildHumanizerMessages(sourceText),
+					params: { temperature: 0.2 }
+				},
+				controller.signal
+			);
+			if (!res.body) throw new Error($i18n.t('Server connection failed'));
+
+			const textStream = await createOpenAITextStream(res.body, false);
+			for await (const update of textStream) {
+				if (controller.signal.aborted || history !== currentHistory) break;
+				const { value, done, error } = update;
+				if (error) throw error;
+				if (done) {
+					completed = true;
+					break;
+				}
+				if (responseMessage.content === '' && value === '\n') continue;
+				responseMessage.content += value;
+				history.messages[responseMessageId] = responseMessage;
+				history = history;
+				autoScrollToBottom();
+			}
+		} catch (error) {
+			if (!controller.signal.aborted) {
+				responseMessage.error = { content: getErrorMessage(error) };
+				toast.error(getErrorMessage(error));
+			}
+		} finally {
+			responseMessage.done = true;
+			if (history === currentHistory) {
+				history.messages[responseMessageId] = responseMessage;
+				history = history;
+			}
+			if (humanizerController === controller) humanizerController = null;
+			if (generationController === controller) {
+				generating = false;
+				generationController = null;
+			}
+		}
+
+		if (history !== currentHistory) return null;
+
+		if (!controller.signal.aborted && !responseMessage.error) {
+			try {
+				const hadChat = !!$chatId;
+				const _chatId = hadChat ? $chatId : await initChatHandler(history);
+				if (hadChat) {
+					await saveChatHandler(_chatId, history);
+				} else if (_chatId && !$temporaryChatEnabled) {
+					// The chat is born here instead of in the completion pipeline, so title it too.
+					const title = sourceText.trim().replace(/\s+/g, ' ').slice(0, 50);
+					if (title) {
+						await updateChatById(localStorage.token, _chatId, { title });
+						await chatTitle.set(title);
+						await refreshChatList(localStorage.token);
+					}
+				}
+				if ($chatId) await processNextInQueue($chatId);
+			} catch (error) {
+				console.error(error);
+			}
+		}
+
+		return {
+			status: 'submitted' as const,
+			chatId: $chatId,
+			userMessageId: parentId,
+			assistantMessageId: responseMessageId,
+			taskIds: [] as string[]
+		};
+	};
+
+	// "Humanize" action on the last assistant message: append a humanized copy, original untouched.
+	$: if ($humanizeRequest) {
+		const messageId = $humanizeRequest.messageId;
+		humanizeRequest.set(null);
+		const source = history.messages[messageId];
+		if (source?.role === 'assistant' && source.done && history.currentId === messageId) {
+			const text = getOutputText(source.output) || removeAllDetails(source.content ?? '');
+			if (text.trim()) runHumanizer(messageId, text);
+		}
+	}
+
+	onDestroy(() => humanizerController?.abort());
 
 	const handleManualCompact = async () => {
 		if (!contextCompactionEnabled) {
@@ -4513,11 +4689,13 @@
 			true;
 		// Always include system prompt — backend extracts it and prepends to DB messages.
 		// Only temp chats need conversation messages (persisted chats load from DB).
-		let messages: any[] = [
-			params?.system || $settings.system
-				? { role: 'system', content: `${params?.system || $settings?.system || ''}` }
-				: undefined
-		].filter(Boolean);
+		const presetSystem = codingPresetForChat ? CODING_SYSTEM_PROMPT : '';
+		const systemContent = [presetSystem, params?.system || $settings?.system || '']
+			.filter(Boolean)
+			.join('\n\n');
+		let messages: any[] = systemContent
+			? [{ role: 'system', content: systemContent }]
+			: [];
 
 		if ($temporaryChatEnabled) {
 			messages = [

@@ -321,7 +321,13 @@
 										id="logo"
 										crossorigin="anonymous"
 										src="{WEBUI_BASE_URL}/static/favicon.png"
-										class="size-24 rounded-full"
+										class="size-24 rounded-full hidden dark:block"
+										alt="{$WEBUI_NAME} logo"
+									/>
+									<img
+										crossorigin="anonymous"
+										src="{WEBUI_BASE_URL}/static/logo-light.png"
+										class="size-24 rounded-full dark:hidden"
 										alt="{$WEBUI_NAME} logo"
 									/>
 								</div>
@@ -705,7 +711,13 @@
 							id="logo"
 							crossorigin="anonymous"
 							src="{WEBUI_BASE_URL}/static/favicon.png"
-							class=" w-6 rounded-full"
+							class=" w-6 rounded-full hidden dark:block"
+							alt=""
+						/>
+						<img
+							crossorigin="anonymous"
+							src="{WEBUI_BASE_URL}/static/logo-light.png"
+							class=" w-6 rounded-full dark:hidden"
 							alt=""
 						/>
 					</div>

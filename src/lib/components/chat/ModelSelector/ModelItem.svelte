@@ -128,6 +128,14 @@
 			</div>
 
 			<div class="flex shrink-0 items-center gap-1.5">
+				{#if item.serverTag}
+					<span
+						class="max-w-[6rem] truncate rounded border border-gray-200 px-1 font-mono text-[0.5625rem] uppercase leading-3.5 tracking-wider text-gray-500 dark:border-gray-800 dark:text-gray-500"
+						data-server-tag
+					>
+						{item.serverTag}
+					</span>
+				{/if}
 				{#if item.model.owned_by === 'ollama'}
 					{#if (item.model.ollama?.details?.parameter_size ?? '') !== ''}
 						<div class="flex items-center translate-y-[0.5px]">

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext, tick } from 'svelte';
-	const i18n = getContext('i18n');
+	const i18n: any = getContext('i18n');
 
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Switch from '$lib/components/common/Switch.svelte';
@@ -11,6 +11,7 @@
 	import Wrench from '$lib/components/icons/Wrench.svelte';
 	import ManageOllamaModal from './ManageOllamaModal.svelte';
 	import Download from '$lib/components/icons/Download.svelte';
+	import { getServerAlias, serverAliases, setServerAlias } from '$lib/utils/serverAliases';
 
 	export let onDelete = () => {};
 	export let onSubmit = () => {};
@@ -21,6 +22,14 @@
 
 	let showManageModal = false;
 	let showConfigModal = false;
+
+	// Display alias for this connection (browser-local, keyed by base URL).
+	let alias = '';
+	let aliasUrl: string | null = null;
+	$: if (url !== aliasUrl) {
+		aliasUrl = url;
+		alias = getServerAlias(url, $serverAliases);
+	}
 </script>
 
 <AddConnectionModal
@@ -67,6 +76,16 @@
 			readonly={true}
 		/>
 	</Tooltip>
+
+	<input
+		class="w-28 shrink-0 self-start border-b border-gray-100 bg-transparent text-sm text-gray-600 outline-hidden transition-colors duration-150 placeholder:text-gray-400 focus:border-gray-400 dark:border-gray-850 dark:text-gray-400 dark:placeholder:text-gray-600 dark:focus:border-gray-600"
+		placeholder={$i18n.t('Alias')}
+		aria-label={$i18n.t('Alias')}
+		title={$i18n.t('Shown as the server name in the model selector (stored in this browser)')}
+		maxlength="40"
+		bind:value={alias}
+		on:input={() => setServerAlias(url, alias)}
+	/>
 
 	<div class="flex gap-1 items-center">
 		<Tooltip content={$i18n.t('Manage')} className="self-start">

@@ -395,7 +395,7 @@ input[type='number'] {
 }
 
 .tippy-box[data-theme~='dark'] {
-	@apply rounded-lg bg-gray-950 text-xs border border-gray-900 shadow-xl;
+	@apply rounded-lg bg-gray-950 text-xs border border-gray-800 shadow-xl;
 }
 
 .password {
@@ -422,7 +422,7 @@ input[type='number'] {
 }
 
 .bg-gray-950-90 {
-	background-color: rgba(var(--color-gray-950, #0d0d0d), 0.9);
+	background-color: rgba(var(--color-gray-950, #060606), 0.9);
 }
 
 .ProseMirror {
@@ -865,13 +865,13 @@ html.high-contrast.dark .ProseMirror p.is-editor-empty:first-child::before {
 }
 
 body {
-	background: #fff;
-	color: #000;
+	background: #fafaf7;
+	color: #0a0a0a;
 }
 
 .dark body {
-	background: #171717;
-	color: #eee;
+	background: #0a0a0a;
+	color: #dadbdf;
 }
 
 /* Position the handle relative to each LI */
@@ -1218,4 +1218,76 @@ html.high-contrast:not(.dark) .shimmer {
 .office-preview table td:focus {
 	outline: 2px solid rgba(59, 130, 246, 0.5);
 	outline-offset: -2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* HUGO Harness: xAI dark design language (colors / type / radii only) */
+/* ------------------------------------------------------------------ */
+:root {
+	--hugo-canvas: #0a0a0a;
+	--hugo-canvas-soft: #1a1c20;
+	--hugo-card: #191919;
+	--hugo-canvas-mid: #363a3f;
+	--hugo-hairline: #212327;
+	--hugo-ink: #ffffff;
+	--hugo-body: #dadbdf;
+	--hugo-mute: #7d8187;
+	--hugo-sunset: #ff7a17;
+	--hugo-dusk: #7c3aed;
+	--hugo-twilight: #c4b5fd;
+	--hugo-breeze: #a0c3ec;
+	--hugo-heartbeat: #3ddc97;
+	--hugo-pill-border: rgba(255, 255, 255, 0.25);
+}
+
+/* light mode: polarity-flipped canvas/ink, same accents */
+html:not(.dark) {
+	--color-white: #fafaf7;
+	--hugo-canvas: #fafaf7;
+	--hugo-ink: #0a0a0a;
+	--hugo-body: #363a3f;
+	--hugo-hairline: #e1e1de;
+	--hugo-pill-border: rgba(10, 10, 10, 0.2);
+}
+
+::selection {
+	background: rgba(255, 122, 23, 0.35);
+}
+
+/* pill chips / CTAs: translucent hairline ring (inset so layout never shifts) */
+.dark button.rounded-full[class*='px-']:not([class*='bg-white']):not([class*='bg-transparent']),
+.dark a.rounded-full[class*='px-']:not([class*='bg-white']) {
+	box-shadow: inset 0 0 0 1px var(--hugo-pill-border);
+}
+
+html:not(.dark) button.rounded-full[class*='px-']:not([class*='bg-black']):not([class*='dark:bg-white']) {
+	box-shadow: inset 0 0 0 1px var(--hugo-pill-border);
+}
+
+/* display type: regular weight, tight tracking */
+.text-3xl,
+.text-4xl,
+.text-5xl,
+.text-6xl,
+.text-7xl,
+.text-8xl {
+	font-weight: 400;
+	letter-spacing: -0.025em;
+}
+
+h1,
+h2 {
+	letter-spacing: -0.02em;
+}
+
+/* eyebrows / section labels / counters: mono, uppercase, positive tracking */
+.uppercase,
+.eyebrow {
+	font-family: var(--font-mono);
+	letter-spacing: 0.08em;
+}
+
+.eyebrow {
+	text-transform: uppercase;
+	font-size: 0.6875rem;
 }
