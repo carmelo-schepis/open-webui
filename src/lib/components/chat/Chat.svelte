@@ -384,6 +384,17 @@
 	let codingPresetChatId = '';
 	$: if (codingPresetActive && $chatId) codingPresetChatId = $chatId;
 	$: codingPresetForChat = codingPresetActive || (codingPresetChatId === $chatId && !!codingPresetChatId);
+	// Fresh chats skip setDefaults entirely, so apply the interpreter toggle
+	// once the model list and permissions settle instead.
+	let interpreterPresetApplied = false;
+	$: interpreterAvailable =
+		$config?.features?.enable_code_interpreter &&
+		($user?.role === 'admin' || $user?.permissions?.features?.code_interpreter) &&
+		($models ?? []).every((model) => model.info?.meta?.capabilities?.code_interpreter ?? true);
+	$: if (codingPresetForChat && interpreterAvailable && !interpreterPresetApplied) {
+		interpreterPresetApplied = true;
+		codeInterpreterEnabled = true;
+	}
 	const CODING_SYSTEM_PROMPT =
 		'You are an expert coding assistant. Prefer complete, runnable code over prose. Include brief explanations of key decisions, note edge cases, and keep code in fenced code blocks with the correct language tag.';
 	let webSearchActive = false;

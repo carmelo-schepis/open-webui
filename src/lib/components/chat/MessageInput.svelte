@@ -75,7 +75,11 @@
 	import { uploadFile } from '$lib/apis/files';
 	import { filesystemFile, getCwd, uploadNewFileToTerminal } from '$lib/apis/terminal';
 	import { isSavedChatId } from '$lib/utils/chatId';
-	import { isAutoOpenPending, retireAutoOpen } from '$lib/utils/modelSelectorAutoOpen';
+	import {
+		isAutoOpenPending,
+		noteAutoOpenAttempt,
+		retireAutoOpen
+	} from '$lib/utils/modelSelectorAutoOpen';
 	import { humanizerEnabled } from '$lib/utils/humanizer';
 	import { generateAutoCompletion } from '$lib/apis';
 	import { deleteFileById } from '$lib/apis/files';
@@ -819,9 +823,17 @@
 	// Open the model selector once on a brand-new chat, after the model list has loaded.
 	const maybeAutoOpenModelSelector = (currentChatId: string, currentMessageId: string | null) => {
 		if (!isAutoOpenPending()) return;
-		retireAutoOpen();
-		if (currentChatId || currentMessageId || window.location.pathname !== '/') return;
-		tick().then(() => modelSelector?.open());
+		if (currentChatId || currentMessageId || window.location.pathname !== '/') {
+			// The one-shot only applies to a fresh home-page chat.
+			retireAutoOpen();
+			return;
+		}
+		// The input can remount while models settle; keep the one-shot pending
+		// until an attempt sticks on a stable instance.
+		noteAutoOpenAttempt();
+		tick().then(() => {
+			modelSelector?.open();
+		});
 	};
 	$: if (modelSelector && $models.length > 0) {
 		maybeAutoOpenModelSelector(chatId, history?.currentId ?? null);

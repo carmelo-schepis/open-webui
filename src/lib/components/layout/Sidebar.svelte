@@ -1358,13 +1358,18 @@
 					Do not alter, remove, obscure, or replace it except as LICENSE permits:
 					https://docs.openwebui.com/license. -->
 						<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-						<img
-							crossorigin="anonymous"
-							src="{WEBUI_BASE_URL}/static/favicon.png"
-							class="sidebar-new-chat-icon size-5 rounded-full"
-							alt=""
-							on:click={logoEasterEgg}
-						/>
+							<img
+								crossorigin="anonymous"
+								src="{WEBUI_BASE_URL}/static/favicon.png"
+								class="sidebar-new-chat-icon size-5 rounded-full"
+								alt=""
+								on:click={(e) => {
+									// Keep the wrapper's New Chat navigation from resetting the counter.
+									e.preventDefault();
+									e.stopPropagation();
+									logoEasterEgg();
+								}}
+							/>
 					</a>
 
 					<a href="/" class="flex min-w-0 flex-1 px-0.5" on:click={newChatHandler}>

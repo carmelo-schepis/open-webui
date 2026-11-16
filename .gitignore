@@ -315,3 +315,8 @@ cypress/screenshots
 
 # Local temporary fixtures and screenshots
 /tmp/
+
+# Playwright harness artifacts
+tests/.auth/
+playwright-report/
+test-results/

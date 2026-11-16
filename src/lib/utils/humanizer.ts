@@ -12,7 +12,20 @@ Use direct sentences, concrete wording, simple verbs, natural sentence-length va
 Return only the final rewritten text. Don't describe your edits, add a heading, or wrap the result in quotation marks or code fences.`;
 
 /** Whether the next sent message is rewritten by the Humanizer instead of answered. */
-export const humanizerEnabled = writable(false);
+const HUMANIZER_STORAGE_KEY = 'hugo.humanizerEnabled';
+
+const storedHumanizerEnabled =
+	typeof localStorage !== 'undefined' && localStorage.getItem(HUMANIZER_STORAGE_KEY) === 'true';
+
+export const humanizerEnabled = writable(storedHumanizerEnabled);
+
+humanizerEnabled.subscribe((value) => {
+	try {
+		localStorage.setItem(HUMANIZER_STORAGE_KEY, String(value));
+	} catch {
+		/* storage unavailable; the toggle just won't persist */
+	}
+});
 
 /** Set by the response-message action menu; Chat.svelte picks it up and appends a humanized block. */
 export const humanizeRequest = writable<{ messageId: string } | null>(null);

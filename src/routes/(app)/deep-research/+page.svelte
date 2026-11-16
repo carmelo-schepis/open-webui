@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { getContext } from 'svelte';
+	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { models } from '$lib/stores';
 	import type i18nType from '$lib/i18n';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -43,6 +46,10 @@
 			serviceOnline = false;
 		}
 	};
+
+	onMount(() => {
+		checkService();
+	});
 
 	const handleEvent = (event: ResearchEvent) => {
 		switch (event.type) {
@@ -87,6 +94,20 @@
 		}
 	};
 
+	/** Pick the synthesis model: the chat's selected model first, else the first available Ollama model. */
+	const resolveResearchModel = (): string | undefined => {
+		try {
+			const session = JSON.parse(sessionStorage.selectedModels ?? '[]').filter(Boolean);
+			if (session.length) return session[0];
+		} catch {
+			/* no session selection */
+		}
+		const ollamaModel = get(models).find(
+			(model) => model.owned_by === 'ollama' && !model.info?.meta?.hidden
+		);
+		return ollamaModel?.id;
+	};
+
 	const run = async () => {
 		if (!query.trim() || running) return;
 
@@ -94,7 +115,11 @@
 		running = true;
 		controller = new AbortController();
 		try {
-			await streamResearch(query.trim(), { signal: controller.signal, onEvent: handleEvent });
+			await streamResearch(query.trim(), {
+				model: resolveResearchModel(),
+				signal: controller.signal,
+				onEvent: handleEvent
+			});
 			if (phase !== 'error') {
 				phase = 'completed';
 				if (!statusMessage) statusMessage = 'Done';
@@ -151,22 +176,22 @@
 			<div class="flex items-center gap-2">
 				<h1 class="text-lg font-medium">{$i18n.t('Deep Research')}</h1>
 				<span
-					class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] uppercase tracking-wider {$serviceOnline === true
+					class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] uppercase tracking-wider {serviceOnline === true
 						? 'bg-green-500/10 text-green-500'
-						: $serviceOnline === false
+						: serviceOnline === false
 							? 'bg-red-500/10 text-red-500'
 							: 'bg-gray-500/10 text-gray-500'}"
 				>
 					<span
-						class="size-1.5 rounded-full {$serviceOnline === true
+						class="size-1.5 rounded-full {serviceOnline === true
 							? 'bg-green-500'
-							: $serviceOnline === false
+							: serviceOnline === false
 								? 'bg-red-500'
 								: 'bg-gray-400'}"
 					></span>
-					{$serviceOnline === true
+					{serviceOnline === true
 						? $i18n.t('Service online')
-						: $serviceOnline === false
+						: serviceOnline === false
 							? $i18n.t('Service offline')
 							: $i18n.t('Checking service')}
 				</span>
@@ -191,6 +216,7 @@
 
 		<div class="flex gap-2">
 			<input
+				id="deep-research-query"
 				class="flex-1 rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-sm outline-hidden"
 				bind:value={query}
 				on:keydown={(e) => {
